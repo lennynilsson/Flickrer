@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Application theme. -->
+    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="android:actionBarStyle">@style/FlickrActionBar</item>
+
+        <!-- Support library compatibility -->
+        <item name="actionBarStyle">@style/FlickrActionBar</item>
+    </style>
+
+    <!-- Action bar theme. -->
+    <style name="FlickrActionBar" parent="@style/Widget.AppCompat.ActionBar">
+        <item name="android:background">@drawable/background</item>
+        <!--<item name="android:windowActionBarOverlay">true</item> -->
+
+        <!-- Support library compatibility -->
+        <item name="background">@drawable/background</item>
+        <!--<item name="windowActionBarOverlay">true</item> -->
+    </style>
+
+    <drawable name="background">@color/orange</drawable>
+    <drawable name="black">@color/black</drawable>
+</resources>

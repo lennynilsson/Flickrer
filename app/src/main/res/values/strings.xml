@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Flickrer</string>
+    <string name="placeholder">Placeholder</string>
+    <string name="api_key">bd29e274e9626faabb31ab494ba6c84b</string>
+    <string name="title_activity_image">ImageActivity</string>
+    <string name="action_search">Search</string>
+    <string name="initial_query">flickrer</string>
+
+</resources>

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/black">
+    <se.bylenny.flickrer.FixedImageView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/image"
+        android:layout_gravity="center_horizontal|top"
+        android:scaleType="fitXY" />
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="#c8000000"
+        android:paddingTop="@dimen/vpadding"
+        android:paddingBottom="@dimen/vpadding"
+        android:paddingRight="@dimen/hpadding"
+        android:paddingLeft="@dimen/hpadding">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceMediumInverse"
+            android:text="@string/placeholder"
+            android:id="@+id/title"
+            android:layout_marginBottom="@dimen/vpadding"
+            android:singleLine="true"
+            android:shadowColor="@drawable/black"
+            android:textStyle="bold"
+            android:typeface="serif"
+            android:textColor="@color/white" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceSmallInverse"
+            android:text="@string/placeholder"
+            android:id="@+id/creator"
+            android:singleLine="true"
+            android:shadowColor="@drawable/black"
+            android:textStyle="italic"
+            android:typeface="serif"
+            android:textColor="@color/white" />
+    </LinearLayout>
+</FrameLayout>
