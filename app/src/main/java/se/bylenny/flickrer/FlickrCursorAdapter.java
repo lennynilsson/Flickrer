@@ -32,7 +32,9 @@ public class FlickrCursorAdapter extends CursorAdapter {
     private int resolution;
     private LayoutInflater inflater;
 
-    private class Tag {
+    public class Tag {
+        public String image;
+        public String title;
         public FixedImageView imageView;
         public TextView titleView;
         public TextView creatorView;
@@ -100,16 +102,18 @@ public class FlickrCursorAdapter extends CursorAdapter {
             post = mapper.mapRow(cursor.getColumnNames(), columns);
             dao.refresh(post);
             if (post.getImages() == null) {
-                Log.d(TAG, "Dead cursor");
+                listener.onBroken();
                 return;
             }
         } catch (SQLException e) {
-            Log.d(TAG, "Unable to load image", e);
+            listener.onBroken();
             return;
         }
 
-        Image image = selectBestImage(post.getImages());
+        Image image = selectBestImage(post.getImages(), resolution);
         tag.imageView.setAspect(image.getWidth(), image.getHeight());
+        tag.image = selectBestImage(post.getImages(), 2500).getUrl();
+        tag.title = post.getTitle();
         Picasso.with(context)
                 .load(image.getUrl())
                 .fit()
@@ -135,9 +139,10 @@ public class FlickrCursorAdapter extends CursorAdapter {
     /**
      * Find the image with a resolution closest to the screen resolution.
      * @param images A list of images
+     * @param resolution The prefered image resolution
      * @return The image with a resolution closest to the screens
      */
-    private Image selectBestImage(ForeignCollection<Image> images) {
+    private Image selectBestImage(ForeignCollection<Image> images, int resolution) {
         Image image = null;
         for (Image i : images) {
             if (image == null ||

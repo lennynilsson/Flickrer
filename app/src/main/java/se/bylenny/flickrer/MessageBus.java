@@ -6,9 +6,6 @@ import android.os.Looper;
 
 import com.squareup.otto.Bus;
 
-/**
- * Created by Lenny Nilsson on 2015-02-03.
- */
 public class MessageBus extends Bus {
 
     private static final MessageBus BUS = new MessageBus();

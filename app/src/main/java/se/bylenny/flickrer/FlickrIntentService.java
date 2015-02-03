@@ -1,22 +1,15 @@
 package se.bylenny.flickrer;
 
-import android.app.Activity;
 import android.app.IntentService;
-import android.app.PendingIntent;
-import android.content.Intent;
 import android.content.Context;
-import android.database.sqlite.SQLiteDatabase;
+import android.content.Intent;
 import android.net.Uri;
-import android.os.Bundle;
-import android.os.Handler;
-import android.os.ResultReceiver;
 import android.util.Log;
 
 import com.j256.ormlite.android.apptools.OpenHelperManager;
 import com.j256.ormlite.dao.Dao;
 
 import java.sql.SQLException;
-import java.util.concurrent.Callable;
 
 import se.bylenny.flickrer.models.external.FlickrResponse;
 import se.bylenny.flickrer.models.external.Photo;
@@ -30,8 +23,6 @@ public class FlickrIntentService extends IntentService {
     private static final String ACTION_FETCH = "se.bylenny.flickrer.action.FETCH";
     private static final String EXTRA_RESET = "se.bylenny.flickrer.extra.RESET";
     public static final String EXTRA_TEXT = "se.bylenny.flickrer.extra.TEXT";
-    public static final String EXTRA_PAGE = "se.bylenny.flickrer.extra.EXTRA_PAGE";
-    public static final String EXTRA_PAGES = "se.bylenny.flickrer.extra.EXTRA_PAGES";
 
     public static final int RESULT_FETCH_SUCCESS = 1;
     public static final int RESULT_RESET_SUCCESS = 2;
@@ -66,8 +57,7 @@ public class FlickrIntentService extends IntentService {
             try {
                 handleActionFetch(text, reset);
             } catch (SQLException e) {
-                Log.e(TAG, "Unable to fetch query", e);
-                MessageBus.send(RESULT_FETCH_ERROR);
+                MessageBus.send(reset ? RESULT_RESET_ERROR : RESULT_FETCH_ERROR);
             }
         }
     }
@@ -77,7 +67,6 @@ public class FlickrIntentService extends IntentService {
      * parameters.
      */
     private synchronized void handleActionFetch(final String text, final boolean reset) throws SQLException {
-        Log.d(TAG, "handleActionFetch");
         Dao<Query, String> dao = getHelper(getApplicationContext()).getQueryDao();
         Query query = dao.queryForId(text);
         if (query == null) {
@@ -94,13 +83,13 @@ public class FlickrIntentService extends IntentService {
             dao.update(query);
         } else if (query.getLastPage() >= query.getPageCount()) {
             Log.d(TAG, "End of list");
-            MessageBus.send(RESULT_FETCH_ERROR);
+            MessageBus.send(reset ? RESULT_RESET_ERROR : RESULT_FETCH_ERROR);
             return;
         }
-        fetch(text, query.getLastPage() + 1);
+        fetch(text, query.getLastPage() + 1, reset);
     }
 
-    private void fetch(final String text, long page) {
+    private void fetch(final String text, long page, final boolean reset) {
         String apiKey = getApplicationContext().getString(R.string.api_key);
         FlickrRestRequest<FlickrResponse> request = new FlickrRestRequest<FlickrResponse>();
         Uri uri = createQuery(apiKey, text, page);
@@ -116,10 +105,10 @@ public class FlickrIntentService extends IntentService {
                             public void run() {
                                 try {
                                     translateAndStore(response, text);
-                                    MessageBus.send(RESULT_FETCH_SUCCESS);
+                                    MessageBus.send(reset ? RESULT_RESET_SUCCESS : RESULT_FETCH_SUCCESS);
                                 } catch (SQLException e) {
                                     Log.e(TAG, "Unable to translate response", e);
-                                    MessageBus.send(RESULT_FETCH_ERROR);
+                                    MessageBus.send(reset ? RESULT_RESET_ERROR : RESULT_FETCH_ERROR);
                                 }
                             }
                         }, TAG);
@@ -129,7 +118,7 @@ public class FlickrIntentService extends IntentService {
                 @Override
                 public void onFailure(String error) {
                     Log.e(TAG, error == null ? "" : error);
-                    MessageBus.send(RESULT_FETCH_ERROR);
+                    MessageBus.send(reset ? RESULT_RESET_ERROR : RESULT_FETCH_ERROR);
                 }
             });
     }
