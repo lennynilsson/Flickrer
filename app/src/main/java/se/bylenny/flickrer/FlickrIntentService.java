@@ -28,7 +28,6 @@ public class FlickrIntentService extends IntentService {
     private static final String TAG = "FlickrIntentService";
 
     private static final String ACTION_FETCH = "se.bylenny.flickrer.action.FETCH";
-    private static final String EXTRA_RECEIVER = "se.bylenny.flickrer.extra.EXTRA_RECEIVER";
     private static final String EXTRA_RESET = "se.bylenny.flickrer.extra.RESET";
     public static final String EXTRA_TEXT = "se.bylenny.flickrer.extra.TEXT";
     public static final String EXTRA_PAGE = "se.bylenny.flickrer.extra.EXTRA_PAGE";
@@ -41,22 +40,17 @@ public class FlickrIntentService extends IntentService {
 
     public static final int PAGE_SIZE = 50;
 
-    private boolean isFetching = false;
-
     private static FlickrDatabaseHelper helper;
 
     /**
      * Starts this service to perform action Fetch with the given parameters. If
      * the service is already performing a task this action will be queued.
      */
-    public static void startActionFetch(Context context, String text, boolean reset, FlickrResultReceiver.Receiver receiver) {
-        FlickrResultReceiver rReceiver = new FlickrResultReceiver(new Handler());
-        rReceiver.setReceiver(receiver);
+    public static void startActionFetch(Context context, String text, boolean reset) {
         Intent intent = new Intent(context, FlickrIntentService.class);
         intent.setAction(ACTION_FETCH);
         intent.putExtra(EXTRA_TEXT, text);
         intent.putExtra(EXTRA_RESET, reset);
-        intent.putExtra(EXTRA_RECEIVER, rReceiver);
         context.startService(intent);
     }
 
@@ -69,18 +63,11 @@ public class FlickrIntentService extends IntentService {
         if (intent != null && ACTION_FETCH.equals(intent.getAction())) {
             final String text = intent.getStringExtra(EXTRA_TEXT);
             final boolean reset = intent.getBooleanExtra(EXTRA_RESET, false);
-            final ResultReceiver receiver = intent.getParcelableExtra(EXTRA_RECEIVER);
-            if (isFetching) {
-                receiver.send(RESULT_FETCH_ERROR, null);
-                return;
-            }
-            isFetching = true;
             try {
-                handleActionFetch(text, reset, receiver);
+                handleActionFetch(text, reset);
             } catch (SQLException e) {
                 Log.e(TAG, "Unable to fetch query", e);
-                receiver.send(RESULT_FETCH_ERROR, null);
-                isFetching = false;
+                MessageBus.send(RESULT_FETCH_ERROR);
             }
         }
     }
@@ -89,7 +76,7 @@ public class FlickrIntentService extends IntentService {
      * Handle action Fetch in the provided background thread with the provided
      * parameters.
      */
-    private void handleActionFetch(final String text, final boolean reset, final ResultReceiver receiver) throws SQLException {
+    private synchronized void handleActionFetch(final String text, final boolean reset) throws SQLException {
         Log.d(TAG, "handleActionFetch");
         Dao<Query, String> dao = getHelper(getApplicationContext()).getQueryDao();
         Query query = dao.queryForId(text);
@@ -107,19 +94,16 @@ public class FlickrIntentService extends IntentService {
             dao.update(query);
         } else if (query.getLastPage() >= query.getPageCount()) {
             Log.d(TAG, "End of list");
-            receiver.send(RESULT_FETCH_ERROR, null);
-            isFetching = false;
+            MessageBus.send(RESULT_FETCH_ERROR);
             return;
         }
-        fetch(text, query.getLastPage() + 1, receiver);
+        fetch(text, query.getLastPage() + 1);
     }
 
-    private void fetch(final String text, long page, final ResultReceiver receiver) {
+    private void fetch(final String text, long page) {
         String apiKey = getApplicationContext().getString(R.string.api_key);
         FlickrRestRequest<FlickrResponse> request = new FlickrRestRequest<FlickrResponse>();
         Uri uri = createQuery(apiKey, text, page);
-        final Bundle bundle = new Bundle();
-        bundle.putString(EXTRA_TEXT, text);
         request.call(uri, FlickrResponse.class,
             new FlickrRestRequest.ResponseListener<FlickrResponse>() {
                 @Override
@@ -130,19 +114,13 @@ public class FlickrIntentService extends IntentService {
                         Thread thread = new Thread(new Runnable() {
                             @Override
                             public void run() {
-                                Query query = null;
                                 try {
-                                    query = translateAndStore(response, text);
+                                    translateAndStore(response, text);
+                                    MessageBus.send(RESULT_FETCH_SUCCESS);
                                 } catch (SQLException e) {
                                     Log.e(TAG, "Unable to translate response", e);
-                                    receiver.send(RESULT_FETCH_ERROR, bundle);
-                                    isFetching = false;
-                                    return;
+                                    MessageBus.send(RESULT_FETCH_ERROR);
                                 }
-                                bundle.putLong(EXTRA_PAGE, query.getLastPage());
-                                bundle.putLong(EXTRA_PAGES, query.getPageCount());
-                                receiver.send(RESULT_FETCH_SUCCESS, bundle);
-                                isFetching = false;
                             }
                         }, TAG);
                         thread.start();
@@ -151,8 +129,7 @@ public class FlickrIntentService extends IntentService {
                 @Override
                 public void onFailure(String error) {
                     Log.e(TAG, error == null ? "" : error);
-                    receiver.send(RESULT_FETCH_ERROR, bundle);
-                    isFetching = false;
+                    MessageBus.send(RESULT_FETCH_ERROR);
                 }
             });
     }
@@ -185,7 +162,7 @@ public class FlickrIntentService extends IntentService {
                 .build();
     }
 
-    private Query translateAndStore(FlickrResponse response, String text) throws SQLException {
+    private synchronized void translateAndStore(FlickrResponse response, String text) throws SQLException {
         Log.d(TAG, "Importing \"" + text + "\"...");
         final String[] fields = {"sq", "s", "q", "m", "n", "z", "c", "l", "o"};
         FlickrDatabaseHelper helper = getHelper(getApplicationContext());
@@ -242,7 +219,6 @@ public class FlickrIntentService extends IntentService {
         }
         query.setLastIndex(lastIndex);
         queryDao.update(query);
-        return query;
     }
 
     @Override

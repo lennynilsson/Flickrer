@@ -16,6 +16,8 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ListView;
 
+import com.squareup.otto.Subscribe;
+
 
 public class MainActivity extends ActionBarActivity implements
         LoaderManager.LoaderCallbacks<Cursor>,
@@ -25,11 +27,13 @@ public class MainActivity extends ActionBarActivity implements
 
     private static final String STATE_TEXT_QUERY = "STATE_TEXT_QUERY";
     private static final String STATE_LIST = "STATE_LIST";
+    private static final String STATE_REFRESHING = "STATE_REFRESHING";
 
     private FlickrCursorAdapter cursorAdapter;
     private ListView listView;
     private SwipeRefreshLayout swipeRefreshLayout;
     private String textQuery;
+    private boolean isRefreshing = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,15 +77,24 @@ public class MainActivity extends ActionBarActivity implements
         initCursor();
     }
 
+    private void setRefreshing(boolean refreshing) {
+        Log.d(TAG, "IS refreshing: " + refreshing);
+        isRefreshing = refreshing;
+        swipeRefreshLayout.setRefreshing(refreshing);
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
+        MessageBus.subscribe(this);
         reloadCursor();
+        setRefreshing(isRefreshing);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
+        MessageBus.unsubscribe(this);
     }
 
     @Override
@@ -89,6 +102,7 @@ public class MainActivity extends ActionBarActivity implements
         super.onRestoreInstanceState(savedInstanceState);
         textQuery = savedInstanceState.getString(
                 STATE_TEXT_QUERY, getResources().getString(R.string.initial_query));
+        isRefreshing = savedInstanceState.getBoolean(STATE_REFRESHING);
         listView.onRestoreInstanceState(savedInstanceState.getParcelable(STATE_LIST));
     }
 
@@ -96,6 +110,7 @@ public class MainActivity extends ActionBarActivity implements
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putString(STATE_TEXT_QUERY, textQuery);
+        outState.putBoolean(STATE_REFRESHING, isRefreshing);
         outState.putParcelable(STATE_LIST, listView.onSaveInstanceState());
     }
 
@@ -104,20 +119,17 @@ public class MainActivity extends ActionBarActivity implements
         updateTitle();
         Log.d(TAG, "CALL startActionFetch "+this.toString());
         FlickrIntentService.startActionFetch(
-                getApplicationContext(), textQuery, reset, new FlickrResultReceiver.Receiver() {
-                    @Override
-                    public void onReceiveResult(int resultCode, Bundle resultData) {
-                        if (resultCode == FlickrIntentService.RESULT_FETCH_SUCCESS
-                            || resultCode == FlickrIntentService.RESULT_FETCH_ERROR) {
-                            swipeRefreshLayout.setRefreshing(false);
-                            if (reset) {
-                                listView.setSelection(0);
-                            }
-                            reloadCursor();
-                        }
-                    }
-                });
-        swipeRefreshLayout.setRefreshing(true);
+                getApplicationContext(), textQuery, reset);
+        setRefreshing(true);
+    }
+
+    @Subscribe
+    public void onUpdate(Integer status) {
+        if (status == FlickrIntentService.RESULT_FETCH_SUCCESS
+                || status == FlickrIntentService.RESULT_FETCH_ERROR) {
+            setRefreshing(false);
+            reloadCursor();
+        }
     }
 
     private void updateTitle() {
@@ -171,10 +183,9 @@ public class MainActivity extends ActionBarActivity implements
 
     @Override
     public void onLoadFinished(Loader<Cursor> loader, Cursor cursor) {
-        if (0 == cursor.getCount()) {
+        setCursor(cursor);
+        if (cursor == null) {
             fetch(textQuery, false);
-        } else {
-            setCursor(cursor);
         }
     }
 
@@ -185,7 +196,7 @@ public class MainActivity extends ActionBarActivity implements
 
     @Override
     public void onListNearEnd() {
-        if (!swipeRefreshLayout.isRefreshing()) {
+        if (!isRefreshing) {
             fetch(textQuery, false);
         }
     }
